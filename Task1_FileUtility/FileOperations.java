@@ -1,15 +1,50 @@
 
 import java.io.*;
+import java.util.Scanner;
 
 public class FileOperations {
     public static void main(String args[]){
         String fileName="sample.txt";
-        writeFile(fileName,"Hello!\nWelcome to Java Handling!");
+        int choice;
+        do{
+            System.out.println("File Menu: ");
+            System.out.println("1. Write to file");
+            System.out.println("2. Read file");
+            System.out.println("3. Modify file contents");
+            System.out.println("4. Exit");
+            System.out.println("Enter your choice: ");
+            Scanner sc=new Scanner(System.in);
+            choice=sc.nextInt();
+            sc.nextLine();
 
-        readFile(fileName);
-        modifyFile(fileName,"Hello","Hello Intern");
-        readFile(fileName);
-    }
+            switch(choice){
+                case 1: System.out.print("Enter text to write: ");
+                        String content=sc.nextLine();
+                        writeFile(fileName, content);
+                        break;
+
+                case 2: readFile(fileName);
+                        break;
+
+                case 3: System.out.print("Enter word to replace: ");
+                String oldWord = sc.nextLine();
+
+                System.out.print("Enter new word: ");
+                String newWord = sc.nextLine();
+
+                modifyFile(fileName, oldWord, newWord);
+                break;
+
+                case 4:
+                System.out.println("Exiting program...");
+                break;
+
+                default:
+                System.out.println("Invalid choice. Try again.");
+            }
+
+        } while(choice != 4);
+    } 
 
     /*Write Function */
     public static void writeFile(String fileName,String content){
@@ -20,7 +55,7 @@ public class FileOperations {
             System.out.println("File written successfully");
         }
         catch(IOException e){
-            System.out.println("Error while writing ");
+            System.out.println("Error while writing "+e.getMessage());
         }
     }
 
@@ -30,7 +65,7 @@ public class FileOperations {
             BufferedReader reader=new BufferedReader(new FileReader(fileName));
             String line;
 
-            System.out.println("Reading file contentt: ");
+            System.out.println("Reading file content: ");
 
             while((line=reader.readLine())!=null){
                 System.out.println(line);
