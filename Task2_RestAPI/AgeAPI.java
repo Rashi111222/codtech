@@ -8,6 +8,7 @@ public class AgeAPI{
 
         try{
             String name;
+            System.out.println("Enter name: ");
             name=sc.nextLine();
 
             String apiURL="https://api.agify.io/?name="+name;
