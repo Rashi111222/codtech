@@ -13,6 +13,16 @@ public class WeatherAPI {
 
         String urlString= "https://api.openweathermap.org/data/2.5/weather?q="
             + city + "&appid=" + apiKey + "&units=metric";
+        
+        URL url = new URL(urlString);
 
+        HttpURLConnection conn =
+            (HttpURLConnection) url.openConnection();
+
+            conn.setRequestMethod("GET");
+
+            BufferedReader reader =
+            new BufferedReader(
+            new InputStreamReader(conn.getInputStream()));
     }
 }
