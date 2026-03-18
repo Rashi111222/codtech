@@ -1,6 +1,7 @@
 import java.io.*;
 import java.util.*;
 import java.net.*;
+import org.json.JSONObject;
 
 public class WeatherAPI {
     public static void main(String args[])
@@ -36,8 +37,22 @@ public class WeatherAPI {
 
             reader.close();
 
-            System.out.println("\nWeather API response:");
-            System.out.println(response.toString());
+            JSONObject json =new JSONObject(response.toString());
+            String cityName= json.getString("name");
+
+            double temp=json.getJSONObject("main").getDouble("temp");
+
+            int humidity=json.getJSONObject("main").getInt("humidity");
+
+            String weather= json.getJSONArray("weather")
+                                .getJSONObject(0)
+                                .getString("description");
+
+            System.out.println("\nWeather Details:");
+System.out.println("City: " + cityName);
+System.out.println("Temperature: " + temp + " °C");
+System.out.println("Humidity: " + humidity + "%");
+System.out.println("Weather: " + weather);
         }
 
         catch(Exception e){
