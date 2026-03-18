@@ -6,7 +6,9 @@ public class WeatherAPI {
     public static void main(String args[])
     {
         Scanner sc=new Scanner(System.in);
-        System.out.println("Enter city name: ");
+
+        try{
+            System.out.println("Enter city name: ");
         String city=sc.nextLine();
 
         String apiKey="3af5c95b01bd893312e8fa1f83ae712a";
@@ -24,5 +26,25 @@ public class WeatherAPI {
             BufferedReader reader =
             new BufferedReader(
             new InputStreamReader(conn.getInputStream()));
+
+            String line;
+            StringBuilder response =new StringBuilder();
+
+            while((line=reader.readLine())!= null){
+                response.append(line);
+            }
+
+            reader.close();
+
+            System.out.println("\nWeather API response:");
+            System.out.println(response.toString());
+        }
+
+        catch(Exception e){
+            System.out.println("Error: "+e.getMessage());
+        }
+        
+        sc.close();
+
     }
 }
