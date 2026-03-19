@@ -11,6 +11,10 @@ public class WeatherAPI {
         try{
             System.out.println("Enter city name: ");
         String city=sc.nextLine();
+        if(city.isEmpty()){
+        city = "Pune";
+        System.out.println("No city entered. Using default: Pune");
+}
 
         String apiKey="3af5c95b01bd893312e8fa1f83ae712a";
 
