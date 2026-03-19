@@ -28,6 +28,12 @@ public class WeatherAPI {
 
             conn.setRequestMethod("GET");
 
+            int responseCode=conn.getResponseCode();
+            if(responseCode!=200){
+                System.out.println("Invalid city name");
+                return;
+            }
+
             BufferedReader reader =
             new BufferedReader(
             new InputStreamReader(conn.getInputStream()));
