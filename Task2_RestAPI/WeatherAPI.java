@@ -52,11 +52,12 @@ public class WeatherAPI {
                                 .getJSONObject(0)
                                 .getString("description");
 
-            System.out.println("\nWeather Details:");
-System.out.println("City: " + cityName);
-System.out.println("Temperature: " + temp + " °C");
-System.out.println("Humidity: " + humidity + "%");
-System.out.println("Weather: " + weather);
+            System.out.println("\n========== Weather Report ==========");
+            System.out.println("City        : " + cityName);
+            System.out.println("Temperature : " + temp + " °C");
+            System.out.println("Humidity    : " + humidity + "%");
+            System.out.println("Condition   : " + weather);
+            System.out.println("====================================");
         }
 
         catch(Exception e){
