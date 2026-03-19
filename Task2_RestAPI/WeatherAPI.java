@@ -58,6 +58,7 @@ public class WeatherAPI {
                                 .getJSONObject(0)
                                 .getString("description");
 
+            weather =weather.substring(0,1).toUpperCase() +weather.substring(1);
             System.out.println("\n========== Weather Report ==========");
             System.out.println("City        : " + cityName);
             System.out.println("Temperature : " + temp + " °C");
