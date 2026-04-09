@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY . .
 
-RUN javac src/*.java
+RUN javac src/ChatServer.java src/ClientHandler.java
 
 CMD ["java", "-cp", "src", "ChatServer"]
