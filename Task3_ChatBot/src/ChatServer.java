@@ -4,7 +4,7 @@ import java.net.*; //general tools like lists
 import java.util.concurrent.*; //thread safe tools
 
 public class ChatServer{
-    private static final int port=8080;
+    
 
     //A thread safe list of all currently connnected clients
     private static final List<ClientHandler> connectedClients= new CopyOnWriteArrayList<>();
@@ -13,6 +13,15 @@ public class ChatServer{
     private static int totalUsersJoined=0;
 
     public static void main(String args[]) throws IOException{
+        int port;
+String portEnv = System.getenv("PORT");
+
+if (portEnv != null) {
+    port = Integer.parseInt(portEnv);
+} else {
+    port = 8080; // fallback for local testing
+}
+  
         System.out.println("╔══════════════════════════════════════╗");
         System.out.println("║  CHAT SERVER STARTING...             ║");
         System.out.println("╚══════════════════════════════════════╝");
