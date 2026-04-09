@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexChat — Multithreaded Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════
+     CSS CUSTOM PROPERTIES (Variables)
+     Change these to retheme the entire app
+  ═══════════════════════════════════════ */
+  :root {
+    --bg:         #0d0d0f;
+    --surface:    #16161a;
+    --surface2:   #1e1e24;
+    --border:     #2a2a35;
+    --accent:     #ff6b35;
+    --accent2:    #7c3aed;
+    --ai-color:   #10b981;
+    --text:       #e8e8f0;
+    --text-muted: #6b6b80;
+    --online:     #22c55e;
+    --radius:     12px;
+    --font-mono:  'Space Mono', monospace;
+    --font-sans:  'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── JOIN SCREEN ── */
+  #joinScreen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .join-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 48px;
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    box-shadow: 0 0 80px rgba(255,107,53,0.08);
+  }
+
+  .join-logo {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+  .join-logo span { color: var(--accent); }
+
+  .join-card h2 {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .join-input-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .join-input-wrap label {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .join-input-wrap input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .join-input-wrap input:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-join {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 14px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.5px;
+  }
+  .btn-join:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-join:active { transform: translateY(0); }
+
+  .join-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── API KEY INPUT ── */
+  .api-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+
+  .api-section label {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--ai-color);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .api-section input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-section input:focus { border-color: var(--ai-color); }
+
+  .api-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ── MAIN LAYOUT ── */
+  #appScreen { display: none; width: 100%; height: 100vh; }
+  #appScreen.visible { display: flex; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .sidebar-header {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .logo span { color: var(--accent); }
+
+  .tagline {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .room-info {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .room-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .room-name {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .room-name::before {
+    content: '#';
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+
+  .online-badge {
+    background: rgba(34,197,94,0.12);
+    color: var(--online);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    padding: 3px 8px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+  }
+  .online-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--online);
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Online users list */
+  .users-section {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .users-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  #usersList { display: flex; flex-direction: column; gap: 6px; }
+
+  .user-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .user-item:hover { background: var(--surface2); }
+
+  .user-avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+  }
+
+  .user-name {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .user-you-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-left: auto;
+  }
+
+  /* AI Status */
+  .ai-status {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ai-avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--ai-color), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .ai-info { display: flex; flex-direction: column; gap: 2px; }
+
+  .ai-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ai-color);
+  }
+
+  .ai-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  /* ── MAIN CHAT AREA ── */
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+
+  .chat-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .chat-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chat-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .conn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: var(--surface2);
+  }
+  .conn-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    transition: background 0.3s;
+  }
+  .conn-dot.connected { background: var(--online); animation: pulse 2s infinite; }
+
+  /* Messages area */
+  #messagesArea {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-behavior: smooth;
+  }
+
+  #messagesArea::-webkit-scrollbar { width: 4px; }
+  #messagesArea::-webkit-scrollbar-track { background: transparent; }
+  #messagesArea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Day divider */
+  .day-divider {
+    text-align: center;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    padding: 16px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .day-divider::before, .day-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Message bubble */
+  .msg-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+
+  .msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 0 46px;
+  }
+
+  .msg-sender {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .msg-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 2px 0;
+  }
+
+  .msg-avatar {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .msg-avatar.hidden { visibility: hidden; }
+
+  .msg-bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px 12px 12px 12px;
+    padding: 10px 14px;
+    max-width: 520px;
+    line-height: 1.55;
+    font-size: 14px;
+    word-break: break-word;
+    animation: msgIn 0.2s ease;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-bubble.own {
+    background: rgba(255,107,53,0.12);
+    border-color: rgba(255,107,53,0.25);
+    border-radius: 12px 4px 12px 12px;
+  }
+
+  .msg-bubble.ai-bubble {
+    background: rgba(16,185,129,0.08);
+    border-color: rgba(16,185,129,0.2);
+  }
+
+  /* System messages */
+  .msg-system {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    padding: 4px 0;
+    animation: msgIn 0.2s ease;
+  }
+
+  /* AI thinking indicator */
+  .typing-indicator {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 2px 0;
+    display: none;
+  }
+  .typing-indicator.visible { display: flex; }
+
+  .typing-dots {
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 4px 12px 12px 12px;
+    padding: 12px 16px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .typing-dot {
+    width: 6px; height: 6px;
+    background: var(--ai-color);
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* ── INPUT BAR ── */
+  .input-bar {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ai-tip {
+    font-size: 11px;
+    color: var(--ai-color);
+    font-family: var(--font-mono);
+    opacity: 0.7;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  #messageInput {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    outline: none;
+    resize: none;
+    min-height: 46px;
+    max-height: 120px;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+  #messageInput:focus { border-color: var(--accent); }
+  #messageInput::placeholder { color: var(--text-muted); }
+
+  .btn-send {
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    width: 46px; height: 46px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.2s, transform 0.1s;
+    color: white;
+    font-size: 18px;
+  }
+  .btn-send:hover { opacity: 0.85; transform: scale(1.05); }
+  .btn-send:active { transform: scale(0.97); }
+  .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     JOIN SCREEN
+══════════════════════════════════════ -->
+<div id="joinScreen">
+  <div class="join-card">
+    <div class="join-logo">Nex<span>Chat</span></div>
+    <h2>A multithreaded real-time chat built with Java Sockets. Enter a name and join the room.</h2>
+
+    <div class="join-input-wrap">
+      <label>Your Display Name</label>
+      <input type="text" id="nameInput" placeholder="e.g. Alice, BobDev, DevMaster..." maxlength="20" />
+    </div>
+
+    <!-- ─ AI API KEY SECTION ─ -->
+    <div class="api-section">
+      <label>🤖 Groq AI Key <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." />
+      <div class="api-hint">
+        Enables the AI Assistant bot. Get a free key at console.anthropic.com.
+        Your key stays in your browser only.
+      </div>
+    </div>
+
+    <button class="btn-join" onclick="joinChat()">JOIN ROOM →</button>
+    <div class="join-note">
+      💡 Tip: Open this page in multiple browser tabs to simulate multiple users!
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════ -->
+<div id="appScreen">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">Nex<span>Chat</span></div>
+      <div class="tagline">// Java WebSocket Server</div>
+    </div>
+
+    <div class="room-info">
+      <div class="room-label">Active Room</div>
+      <div class="room-name">general</div>
+      <div class="online-badge" id="onlineBadge">1 online</div>
+    </div>
+
+    <div class="users-section">
+      <div class="users-label">Connected Users</div>
+      <div id="usersList"></div>
+    </div>
+
+    <div class="ai-status" id="aiStatus" style="display:none">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-info">
+        <div class="ai-name">NexBot</div>
+        <div class="ai-hint">@nexbot to chat</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT AREA -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <div class="chat-title"># general</div>
+        <div class="chat-subtitle" id="chatSubtitle">Connecting to server...</div>
+      </div>
+      <div class="conn-indicator">
+        <div class="conn-dot" id="connDot"></div>
+        <span id="connLabel">Disconnected</span>
+      </div>
+    </div>
+
+    <div id="messagesArea">
+      <div class="day-divider">TODAY</div>
+      <!-- Messages will be injected here by JavaScript -->
+    </div>
+
+    <!-- AI typing indicator -->
+    <div style="padding: 0 24px 0;">
+      <div class="typing-indicator" id="typingIndicator">
+        <div class="msg-avatar" style="background: linear-gradient(135deg, #10b981, #7c3aed)">🤖</div>
+        <div class="typing-dots">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <div class="ai-tip" id="aiTip" style="display:none">
+        💡 Type <strong>@nexbot</strong> followed by your question to ask the AI assistant
+      </div>
+      <div class="input-row">
+        <textarea
+          id="messageInput"
+          placeholder="Send a message... (Enter to send, Shift+Enter for new line)"
+          rows="1"
+          disabled
+        ></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMessage()" disabled>➤</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  JAVASCRIPT — CLIENT SIDE LOGIC
+//
+//  This file handles:
+//  1. WebSocket connection to the Java server
+//  2. Sending and receiving chat messages
+//  3. Calling the Claude AI API when user types @nexbot
+//  4. Rendering messages in the UI
+// ═══════════════════════════════════════════════════════
+
+// ── STATE ──
+let ws = null;               // Our WebSocket connection
+let myName = '';             // Our display name
+let apiKey = '';             // Claude API key (optional)
+let onlineUsers = [];        // List of user names we track locally
+let lastSender = null;       // For grouping messages from same sender
+let reconnectTimer = null;
+
+// Color palette for user avatars (cycles through these)
+const AVATAR_COLORS = [
+  ['#ff6b35', '#fff'],  // orange
+  ['#7c3aed', '#fff'],  // purple
+  ['#2563eb', '#fff'],  // blue
+  ['#dc2626', '#fff'],  // red
+  ['#059669', '#fff'],  // green
+  ['#d97706', '#fff'],  // amber
+];
+
+// Map username → color index
+const userColorMap = {};
+let colorIndex = 0;
+
+function getUserColor(name) {
+  if (!userColorMap[name]) {
+    userColorMap[name] = colorIndex % AVATAR_COLORS.length;
+    colorIndex++;
+  }
+  return AVATAR_COLORS[userColorMap[name]];
+}
+
+// ── JOIN ──
+function joinChat() {
+  const nameInput = document.getElementById('nameInput');
+  const name = nameInput.value.trim();
+
+  if (!name || name.length < 2) {
+    nameInput.style.borderColor = 'var(--accent)';
+    nameInput.focus();
+    return;
+  }
+
+  myName = name;
+  apiKey = document.getElementById('apiKeyInput').value.trim();
+
+  // Show AI bot status if API key is provided
+  if (apiKey) {
+    document.getElementById('aiStatus').style.display = 'flex';
+    document.getElementById('aiTip').style.display = 'block';
+  }
+
+  // Transition to chat screen
+  document.getElementById('joinScreen').style.display = 'none';
+  document.getElementById('appScreen').classList.add('visible');
+
+  // Add ourselves to users list immediately
+  addUserToList(myName, true);
+
+  // Connect to the Java WebSocket server
+  connectToServer();
+}
+
+// Allow Enter key to join
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('nameInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinChat();
+  });
+});
+
+// ── WEBSOCKET CONNECTION ──
+function connectToServer() {
+  setConnectionStatus(false, 'Connecting...');
+
+  // Connect to the Java server running on localhost:8080
+  ws = new WebSocket('ws://localhost:8080');
+
+  // Called when connection is established
+  ws.onopen = () => {
+    console.log('✓ Connected to Java server');
+    setConnectionStatus(true, 'Connected to Java Server');
+
+    // Enable the message input
+    document.getElementById('messageInput').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    document.getElementById('messageInput').focus();
+
+    // Send our name to the server
+    sendToServer({ type: 'setName', content: myName });
+
+    // Add a local welcome message
+    addSystemMessage('🚀 Connected to NexChat server! Say hello!');
+  };
+
+  // Called when we receive a message from the server
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      handleServerMessage(msg);
+    } catch (e) {
+      console.error('Bad message from server:', event.data);
+    }
+  };
+
+  // Called when connection closes
+  ws.onclose = () => {
+    setConnectionStatus(false, 'Disconnected');
+    document.getElementById('messageInput').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    addSystemMessage('⚠️ Disconnected from server. Make sure the Java server is running!');
+
+    // Auto-reconnect after 3 seconds
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectToServer, 3000);
+  };
+
+  // Called on connection error
+  ws.onerror = () => {
+    console.error('WebSocket error - Is the Java server running?');
+  };
+}
+
+// ── HANDLE MESSAGES FROM SERVER ──
+function handleServerMessage(msg) {
+  switch (msg.type) {
+    case 'chat':
+      // A regular chat message from someone
+      renderChatMessage(msg.sender, msg.content, msg.time);
+
+      // Check if this message mentions @nexbot → trigger AI response
+     if (apiKey && msg.content.startsWith('@')) {
+  console.log("AI TRIGGERED (fallback)");
+
+  const question = msg.content.substring(1).trim();
+
+  if (question.length > 0) {
+    triggerAIResponse(question, msg.sender);
+  }
+}
+      break;
+
+    case 'system':
+      // System notifications (join/leave/rename)
+      addSystemMessage(msg.content);
+      // Update user count display
+      updateOnlineCount(msg.userCount);
+      break;
+
+    case 'userCount':
+      updateOnlineCount(msg.userCount);
+      break;
+
+    case 'pong':
+      // Server keepalive response
+      break;
+  }
+}
+
+// ── SEND A MESSAGE ──
+function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+  // Send to Java server
+  sendToServer({ type: 'chat', content: text });
+
+  // Clear the input
+  input.value = '';
+  input.style.height = '46px';
+  input.focus();
+}
+
+// Handle Enter key in textarea
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('messageInput');
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Auto-resize textarea as user types
+  input.addEventListener('input', () => {
+    input.style.height = '46px';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+});
+
+// ── SEND DATA TO SERVER ──
+function sendToServer(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  AI INTEGRATION — CLAUDE API
+//
+//  When a user types "@nexbot <question>", we:
+//  1. Show a typing indicator
+//  2. Call the Claude API directly from the browser
+//  3. Display the response as a message from "NexBot"
+//  4. Broadcast it to everyone (via the server)
+// ══════════════════════════════════════════════════════
+async function triggerAIResponse(question, askedBy) {
+  if (!apiKey) return;
+
+  console.log('🤖 AI triggered by:', askedBy, '| Question:', question);
+
+  // Show the "NexBot is typing..." indicator
+  const typing = document.getElementById('typingIndicator');
+  typing.classList.add('visible');
+  scrollToBottom();
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer " + apiKey,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+   model: "llama-3.3-70b-versatile",
+    messages: [
+      {
+        role: "system",
+        content: `
+You are NexBot, a smart and concise AI assistant in a developer chat app.
+
+Rules:
+- Give clear, short, useful answers
+- If question is technical → explain simply
+- Avoid generic phrases like "How can I help"
+- Be confident and direct
+`},
+      {
+        role: "user",
+        content: question
+      }
+    ]
+  })
+});
+
+const data = await response.json();
+console.log("API RESPONSE:", data);
+
+if (data.error) {
+  throw new Error(data.error.message);
+}
+
+if (!data.choices || data.choices.length === 0) {
+  throw new Error("No choices returned");
+}
+
+const aiReply = data.choices[0].message.content;
+
+
+
+
+    // Hide typing indicator
+    typing.classList.remove('visible');
+
+    // Send the AI's response through the server so everyone sees it
+    sendToServer({
+      type: 'chat',
+      content: `🤖 @${askedBy} — ${aiReply}`
+    });
+
+    // Briefly change our name to NexBot for this message
+    // (In a production app, you'd have a dedicated AI bot account)
+
+  } catch (err) {
+    typing.classList.remove('visible');
+    console.error('AI error:', err);
+
+    // Show error as a local system message (not broadcast)
+    addSystemMessage('⚠️ NexBot error: ' + err.message);
+  }
+}
+
+// ── RENDER A CHAT MESSAGE ──
+function renderChatMessage(sender, content, time) {
+  const area = document.getElementById('messagesArea');
+  const isOwn = sender === myName;
+  const isAI = content.startsWith('🤖');
+  const [bgColor, textColor] = getUserColor(sender);
+
+  // Check if we should group this with the previous message
+  const sameAsBefore = (lastSender === sender);
+  lastSender = sender;
+
+  const group = document.createElement('div');
+  group.className = 'msg-group';
+
+  // Show sender name + time only for the first message in a group
+  if (!sameAsBefore) {
+    const header = document.createElement('div');
+    header.className = 'msg-header';
+    header.innerHTML = `
+      <span class="msg-sender" style="color: ${isAI ? 'var(--ai-color)' : bgColor}">${escapeHTML(sender)}</span>
+      <span class="msg-time">${time}</span>
+    `;
+    group.appendChild(header);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+
+  // Avatar — show only on first message in group
+  const avatar = document.createElement('div');
+  avatar.className = 'msg-avatar' + (sameAsBefore ? ' hidden' : '');
+  if (isAI) {
+    avatar.style.background = 'linear-gradient(135deg, #10b981, #7c3aed)';
+    avatar.textContent = '🤖';
+  } else {
+    avatar.style.background = bgColor;
+    avatar.style.color = textColor;
+    avatar.textContent = sender[0].toUpperCase();
+  }
+
+  // Message bubble
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble' +
+    (isOwn ? ' own' : '') +
+    (isAI ? ' ai-bubble' : '');
+  bubble.textContent = content;
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  group.appendChild(row);
+  area.appendChild(group);
+
+  scrollToBottom();
+}
+
+// ── RENDER A SYSTEM MESSAGE ──
+function addSystemMessage(text) {
+  lastSender = null; // Reset grouping after system message
+  const area = document.getElementById('messagesArea');
+  const el = document.createElement('div');
+  el.className = 'msg-system';
+  el.textContent = text;
+  area.appendChild(el);
+  scrollToBottom();
+}
+
+// ── UPDATE UI STATE ──
+function setConnectionStatus(connected, label) {
+  document.getElementById('connDot').className =
+    'conn-dot' + (connected ? ' connected' : '');
+  document.getElementById('connLabel').textContent = label;
+  document.getElementById('chatSubtitle').textContent =
+    connected ? 'Java WebSocket Server • Port 8080' : label;
+}
+
+function updateOnlineCount(count) {
+  const badge = document.getElementById('onlineBadge');
+  badge.textContent = count + (count === 1 ? ' online' : ' online');
+}
+
+function addUserToList(name, isYou = false) {
+  if (onlineUsers.includes(name)) return;
+  onlineUsers.push(name);
+
+  const list = document.getElementById('usersList');
+  const [bg, fg] = getUserColor(name);
+
+  const item = document.createElement('div');
+  item.className = 'user-item';
+  item.id = 'user-' + name;
+  item.innerHTML = `
+    <div class="user-avatar" style="background:${bg};color:${fg}">${name[0].toUpperCase()}</div>
+    <span class="user-name">${escapeHTML(name)}</span>
+    ${isYou ? '<span class="user-you-badge">you</span>' : ''}
+  `;
+  list.appendChild(item);
+}
+
+function scrollToBottom() {
+  const area = document.getElementById('messagesArea');
+  area.scrollTop = area.scrollHeight;
+}
+
+// Escape HTML to prevent XSS
+function escapeHTML(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Keepalive ping every 30 seconds
+setInterval(() => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    sendToServer({ type: 'ping', content: 'ping' });
+  }
+}, 30000);
+</script>
+</body>
+</html>
