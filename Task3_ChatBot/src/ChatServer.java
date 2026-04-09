@@ -43,6 +43,33 @@ if (portEnv != null) {
                 //  this line "unpauses" and returns a Socket object representing that one user.
                 Socket clientSocket=serverSocket.accept();
 
+                InputStream in = clientSocket.getInputStream();
+    OutputStream out = clientSocket.getOutputStream();
+
+    BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+    String requestLine = reader.readLine();
+
+    // 👉 If browser is requesting webpage
+    if (requestLine != null && requestLine.startsWith("GET / ")) {
+
+        File file = new File("index.html");
+        byte[] fileData = new byte[(int) file.length()];
+        FileInputStream fis = new FileInputStream(file);
+        fis.read(fileData);
+        fis.close();
+
+        String response =
+            "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: text/html\r\n" +
+            "Content-Length: " + fileData.length + "\r\n\r\n";
+
+        out.write(response.getBytes());
+        out.write(fileData);
+        out.flush();
+
+        clientSocket.close();
+        continue; // 🔥 VERY IMPORTANT
+    }
                 totalUsersJoined++;
                 System.out.println("New connection #"+ totalUsersJoined+" from "+clientSocket.getInetAddress().getHostAddress());
 

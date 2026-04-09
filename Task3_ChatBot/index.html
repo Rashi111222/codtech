@@ -807,8 +807,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function connectToServer() {
   setConnectionStatus(false, 'Connecting...');
 
-  // Connect to the Java server running on localhost:8080
-  ws = new WebSocket('ws://localhost:8080');
+  // Connect to the Java server running on live
+  ws = new WebSocket(`wss://${window.location.host}`);
 
   // Called when connection is established
   ws.onopen = () => {
