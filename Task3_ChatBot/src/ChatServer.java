@@ -47,29 +47,39 @@ if (portEnv != null) {
     OutputStream out = clientSocket.getOutputStream();
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-    String requestLine = reader.readLine();
+String requestLine = reader.readLine();
 
-    // 👉 If browser is requesting webpage
-    if (requestLine != null && requestLine.startsWith("GET / ")) {
+// Read full headers
+String line;
+boolean isWebSocket = false;
 
-        File file = new File("index.html");
-        byte[] fileData = new byte[(int) file.length()];
-        FileInputStream fis = new FileInputStream(file);
-        fis.read(fileData);
-        fis.close();
-
-        String response =
-            "HTTP/1.1 200 OK\r\n" +
-            "Content-Type: text/html\r\n" +
-            "Content-Length: " + fileData.length + "\r\n\r\n";
-
-        out.write(response.getBytes());
-        out.write(fileData);
-        out.flush();
-
-        clientSocket.close();
-        continue; // 🔥 VERY IMPORTANT
+while ((line = reader.readLine()) != null && !line.isEmpty()) {
+    if (line.toLowerCase().contains("upgrade: websocket")) {
+        isWebSocket = true;
     }
+}
+
+// 👉 If NOT WebSocket → serve HTML
+if (!isWebSocket) {
+
+    File file = new File("index.html");
+    byte[] fileData = new byte[(int) file.length()];
+    FileInputStream fis = new FileInputStream(file);
+    fis.read(fileData);
+    fis.close();
+
+    String response =
+        "HTTP/1.1 200 OK\r\n" +
+        "Content-Type: text/html\r\n" +
+        "Content-Length: " + fileData.length + "\r\n\r\n";
+
+    out.write(response.getBytes());
+    out.write(fileData);
+    out.flush();
+
+    clientSocket.close();
+    continue;
+}
                 totalUsersJoined++;
                 System.out.println("New connection #"+ totalUsersJoined+" from "+clientSocket.getInetAddress().getHostAddress());
 
