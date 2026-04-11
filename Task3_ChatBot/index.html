@@ -808,7 +808,7 @@ function connectToServer() {
   setConnectionStatus(false, 'Connecting...');
 
   // Connect to the Java server running on live
-  ws = new WebSocket(`wss://${window.location.host}`);
+  ws = new WebSocket("ws://localhost:8080");
 
   // Called when connection is established
   ws.onopen = () => {
