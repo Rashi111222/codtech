@@ -807,8 +807,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function connectToServer() {
   setConnectionStatus(false, 'Connecting...');
 
-  // Connect to the Java server running on live
-  ws = new WebSocket("ws://localhost:8080");
+  // Connect to the Java server running on localhost:8080
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const wsUrl   = isLocal ? 'ws://localhost:8080' : 'wss://' + location.host;
+ws = new WebSocket(wsUrl);
 
   // Called when connection is established
   ws.onopen = () => {
@@ -863,15 +865,12 @@ function handleServerMessage(msg) {
       renderChatMessage(msg.sender, msg.content, msg.time);
 
       // Check if this message mentions @nexbot → trigger AI response
-     if (apiKey && msg.content.startsWith('@')) {
-  console.log("AI TRIGGERED (fallback)");
-
-  const question = msg.content.substring(1).trim();
-
-  if (question.length > 0) {
-    triggerAIResponse(question, msg.sender);
-  }
-}
+      if (apiKey && msg.content.toLowerCase().includes('@nexbot')) {
+        const question = msg.content.replace(/@nexbot/gi, '').trim();
+        if (question) {
+          triggerAIResponse(question, msg.sender);
+        }
+      }
       break;
 
     case 'system':
@@ -942,81 +941,63 @@ function sendToServer(obj) {
 //  4. Broadcast it to everyone (via the server)
 // ══════════════════════════════════════════════════════
 async function triggerAIResponse(question, askedBy) {
-  if (!apiKey) return;
+  if (!apiKey) {
+    addSystemMessage("⚠️ Please enter API key");
+    return;
+  }
 
-  console.log('🤖 AI triggered by:', askedBy, '| Question:', question);
+  console.log("AI triggered:", question);
 
-  // Show the "NexBot is typing..." indicator
   const typing = document.getElementById('typingIndicator');
   typing.classList.add('visible');
-  scrollToBottom();
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer " + apiKey,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-   model: "llama-3.3-70b-versatile",
-    messages: [
-      {
-        role: "system",
-        content: `
-You are NexBot, a smart and concise AI assistant in a developer chat app.
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + apiKey,
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: "You are NexBot. Answer short." },
+          { role: "user", content: question }
+        ]
+      })
+    });
 
-Rules:
-- Give clear, short, useful answers
-- If question is technical → explain simply
-- Avoid generic phrases like "How can I help"
-- Be confident and direct
-`},
-      {
-        role: "user",
-        content: question
-      }
-    ]
-  })
-});
+    console.log("STATUS:", response.status);
 
-const data = await response.json();
-console.log("API RESPONSE:", data);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("API ERROR:", errText);
+      throw new Error("API failed");
+    }
 
-if (data.error) {
-  throw new Error(data.error.message);
-}
+    const data = await response.json();
+    console.log("DATA:", data);
 
-if (!data.choices || data.choices.length === 0) {
-  throw new Error("No choices returned");
-}
+    const aiReply = data.choices?.[0]?.message?.content;
 
-const aiReply = data.choices[0].message.content;
-
-
-
-
-    // Hide typing indicator
     typing.classList.remove('visible');
 
-    // Send the AI's response through the server so everyone sees it
+    if (!aiReply) {
+      throw new Error("Empty AI reply");
+    }
+
     sendToServer({
       type: 'chat',
       content: `🤖 @${askedBy} — ${aiReply}`
     });
 
-    // Briefly change our name to NexBot for this message
-    // (In a production app, you'd have a dedicated AI bot account)
-
   } catch (err) {
     typing.classList.remove('visible');
-    console.error('AI error:', err);
-
-    // Show error as a local system message (not broadcast)
-    addSystemMessage('⚠️ NexBot error: ' + err.message);
+    console.error("AI ERROR:", err);
+    addSystemMessage("⚠️ AI failed: " + err.message);
   }
 }
-
 // ── RENDER A CHAT MESSAGE ──
 function renderChatMessage(sender, content, time) {
   const area = document.getElementById('messagesArea');

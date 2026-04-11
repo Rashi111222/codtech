@@ -1,122 +1,124 @@
-import java.io.*; //tools for reading/writing
-import java.util.*; //tools for networking (sockets,ports, connections)
-import java.net.*; //general tools like lists
-import java.util.concurrent.*; //thread safe tools
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+/**
+ * ═══════════════════════════════════════════════════════
+ *  MULTITHREADED CHAT SERVER
+ *  CodTech Internship - Task 3
+ * ═══════════════════════════════════════════════════════
+ *
+ *  HOW IT WORKS (Simple Explanation):
+ *  - This server listens on a PORT (like a door)
+ *  - When a new user connects, it creates a NEW THREAD for them
+ *  - A Thread = an independent worker that handles one user
+ *  - All threads share a "broadcast" method to send messages to everyone
+ *
+ *  KEY CONCEPTS USED:
+ *  - ServerSocket    → Opens a port and waits for connections
+ *  - Socket          → The actual connection between server and one client
+ *  - Thread          → Handles each client independently (multithreading!)
+ *  - CopyOnWriteArrayList → A thread-safe list (safe for multiple threads)
+ */
+public class ChatServer {
 
-public class ChatServer{
-    
+    // The port number our server will listen on
+    // Think of it like an apartment number in a building
+    private static final int PORT = Integer.parseInt(
+    System.getenv("PORT") != null ? System.getenv("PORT") : "8080"
+);
 
-    //A thread safe list of all currently connnected clients
-    private static final List<ClientHandler> connectedClients= new CopyOnWriteArrayList<>();
+    // A thread-safe list that holds ALL currently connected clients
+    // CopyOnWriteArrayList is used instead of ArrayList because
+    // multiple threads will read/write this list simultaneously
+    private static final List<ClientHandler> connectedClients =
+            new CopyOnWriteArrayList<>();
 
     // Tracks how many total users have ever joined (for giving unique IDs)
-    private static int totalUsersJoined=0;
+    private static int totalUsersJoined = 0;
 
-    public static void main(String args[]) throws IOException{
-        int port;
-String portEnv = System.getenv("PORT");
+    public static void main(String[] args) throws IOException {
 
-if (portEnv != null) {
-    port = Integer.parseInt(portEnv);
-} else {
-    port = 8080; // fallback for local testing
-}
-  
         System.out.println("╔══════════════════════════════════════╗");
-        System.out.println("║  CHAT SERVER STARTING...             ║");
+        System.out.println("║   CODTECH CHAT SERVER STARTING...    ║");
         System.out.println("╚══════════════════════════════════════╝");
-        System.out.println("► Server running on port: " + port);
+        System.out.println("► Server running on port: " + PORT);
         System.out.println("► Open index.html in your browser to connect");
         System.out.println("► Press Ctrl+C to stop the server\n");
 
-        //ServerSocket is what opens port 8080 on your computer and starts listening for connections. 
-        // Without this line, no one can reach your server.
-        //try ( ... ) is called a "try-with-resources" — it means Java will automatically close the ServerSocket when the program ends,
-        //  even if it crashes. You don't have to manually close it.
-        try(ServerSocket serverSocket=new ServerSocket(port)){
+        // ServerSocket opens the "door" on our PORT
+        // The try-with-resources ensures it closes automatically
+        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
 
-            //this loop runs forever. That's intentional! 
-            // A server should never stop accepting users on its own.
-            while(true){
+            // This loop runs FOREVER, always waiting for new connections
+            while (true) {
 
-                //this is the most important line in the whole file. It pauses the program and waits until someone connects. The moment a browser opens a WebSocket connection to port 8080,
-                //  this line "unpauses" and returns a Socket object representing that one user.
-                Socket clientSocket=serverSocket.accept();
+                // .accept() PAUSES here until someone connects
+                // When a user opens the browser, this line unpauses
+               Socket clientSocket = serverSocket.accept();
+totalUsersJoined++;
 
-                InputStream in = clientSocket.getInputStream();
-    OutputStream out = clientSocket.getOutputStream();
+Thread t = new Thread(() -> {
+    try {
+        // peek at first 4096 bytes to check if WebSocket or plain HTTP
+        PushbackInputStream pis = new PushbackInputStream(
+            clientSocket.getInputStream(), 4096);
+        byte[] buf = new byte[4096];
+        int n = pis.read(buf);
+        if (n == -1) { clientSocket.close(); return; }
 
-    BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-String requestLine = reader.readLine();
+        String req = new String(buf, 0, n, "UTF-8");
+        pis.unread(buf, 0, n);
 
-// Read full headers
-String line;
-boolean isWebSocket = false;
-
-while ((line = reader.readLine()) != null && !line.isEmpty()) {
-    if (line.toLowerCase().contains("upgrade: websocket")) {
-        isWebSocket = true;
+        if (req.contains("Upgrade: websocket") || req.contains("Upgrade: WebSocket")) {
+            // WebSocket client — hand to ClientHandler
+            ClientHandler ch = new ClientHandler(clientSocket, pis, totalUsersJoined);
+            connectedClients.add(ch);
+            ch.run();
+        } else {
+            // Plain browser visit — serve index.html
+            serveIndexHtml(clientSocket);
+        }
+    } catch (IOException e) {
+        try { clientSocket.close(); } catch (IOException ignored) {}
     }
-}
-
-// 👉 If NOT WebSocket → serve HTML
-if (!isWebSocket) {
-
-    File file = new File("index.html");
-    byte[] fileData = new byte[(int) file.length()];
-    FileInputStream fis = new FileInputStream(file);
-    fis.read(fileData);
-    fis.close();
-
-    String response =
-        "HTTP/1.1 200 OK\r\n" +
-        "Content-Type: text/html\r\n" +
-        "Content-Length: " + fileData.length + "\r\n\r\n";
-
-    out.write(response.getBytes());
-    out.write(fileData);
-    out.flush();
-
-    clientSocket.close();
-    continue;
-}
-                totalUsersJoined++;
-                System.out.println("New connection #"+ totalUsersJoined+" from "+clientSocket.getInetAddress().getHostAddress());
-
-                //Creating a thread per user
-                ClientHandler newClient=new ClientHandler(clientSocket,totalUsersJoined);
-
-                // Add them to our list of connected clients
-                connectedClients.add(newClient);
-
-                // Start a NEW THREAD for this client
-                // This means the server can handle this client AND keep
-                // accepting new connections at the same time!
-                Thread clientThread = new Thread(newClient);
-                clientThread.setDaemon(true); // Thread dies when server stops
-                clientThread.start();
+});
+t.setDaemon(true);
+t.start();
             }
         }
     }
 
-     /**
+    /**
      * BROADCAST: Send a message to ALL connected clients
      * This is called by any ClientHandler to notify everyone
      *
      * @param message  The text to send
      * @param sender   The client who sent it (we skip sending back to them)
      */
-
-    public static void broadcast(String message, ClientHandler sender){
-        //Loop through every connected client
-        for(ClientHandler client:connectedClients){
-            //send message to everyone including sender
+    public static void broadcast(String message, ClientHandler sender) {
+        // Loop through every connected client
+        for (ClientHandler client : connectedClients) {
+            // Send to everyone INCLUDING the sender (for confirmation)
             client.sendMessage(message);
         }
     }
-
-    /*
-    Remove a client from our list when they disconnect
+    private static void serveIndexHtml(Socket socket) throws IOException {
+    OutputStream out = socket.getOutputStream();
+    java.nio.file.Path path = java.nio.file.Paths.get("index.html");
+    byte[] content = java.nio.file.Files.readAllBytes(path);
+    String headers =
+        "HTTP/1.1 200 OK\r\n" +
+        "Content-Type: text/html; charset=UTF-8\r\n" +
+        "Content-Length: " + content.length + "\r\n" +
+        "Connection: close\r\n\r\n";
+    out.write(headers.getBytes("UTF-8"));
+    out.write(content);
+    out.flush();
+    socket.close();
+}
+    /**
+     * Remove a client from our list when they disconnect
      */
     public static void removeClient(ClientHandler client) {
         connectedClients.remove(client);
@@ -124,7 +126,7 @@ if (!isWebSocket) {
     }
 
     /**
-    Get count of currently connected users
+     * Get count of currently connected users
      */
     public static int getActiveUserCount() {
         return connectedClients.size();

@@ -2,8 +2,9 @@ FROM eclipse-temurin:17
 
 WORKDIR /app
 
-COPY . .
+COPY src/ ./src/
+COPY index.html ./index.html
 
-RUN javac src/ChatServer.java src/ClientHandler.java
+RUN mkdir -p out && javac -d out src/ChatServer.java src/ClientHandler.java
 
-CMD ["java", "-cp", "src", "ChatServer"]
+CMD ["java", "-cp", "out", "ChatServer"]
