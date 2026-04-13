@@ -35,12 +35,10 @@ public class ChatServer {
                     }
 
                     String request = new String(buffer, 0, len);
-
-if (request.startsWith("GET") && !request.contains("Upgrade: websocket")) {
-    serveHTML(socket);
-} else {
-    // Pass the already-read bytes so ClientHandler can do the handshake
+if (request.toLowerCase().contains("upgrade: websocket")) {
     new Thread(new ClientHandler(socket, buffer, len)).start();
+} else {
+    serveHTML(socket);
 }
                 } catch (Exception e) {
                     try { socket.close(); } catch (Exception ignored) {}
