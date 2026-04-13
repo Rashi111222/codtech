@@ -6,7 +6,7 @@ This repository contains tasks completed during my online internship at CodTech 
 
 - Task 1: File Handling Utility (Java)
 - Task 2: Rest API Client
-- Task 3: (Upcoming)
+- Task 3: Multithreaded Chat Application
 - Task 4: (Upcoming)
 
 ## Technologies Used
