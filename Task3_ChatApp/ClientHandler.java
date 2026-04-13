@@ -17,68 +17,50 @@ public class ClientHandler implements Runnable {
     private static final SimpleDateFormat SDF = new SimpleDateFormat("HH:mm");
     private static final String WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-    private final byte[] preRead;
-private final int preReadLen;
+    
 
 // Original constructor (not used anymore but keep it)
 public ClientHandler(Socket socket) {
     this.socket = socket;
-    this.preRead = null;
-    this.preReadLen = 0;
 }
 
-// New constructor — receives the already-read bytes
-public ClientHandler(Socket socket, byte[] preRead, int preReadLen) {
-    this.socket = socket;
-    this.preRead = preRead;
-    this.preReadLen = preReadLen;
-}
+
 
     @Override
     public void run() {
         try {
-           // Wrap the input stream so the pre-read bytes come first
-InputStream rawIn = socket.getInputStream();
-if (preRead != null && preReadLen > 0) {
-    in = new SequenceInputStream(
-        new ByteArrayInputStream(preRead, 0, preReadLen), rawIn
-    );
-} else {
-    in = rawIn;
-}
-out = socket.getOutputStream();
+        in = socket.getInputStream();
+        out = socket.getOutputStream();
 
-            // Step 1: WebSocket handshake
-            if (!doHandshake()) {
-                socket.close();
-                return;
-            }
-
-            // Step 2: First message from client is the username
-            String name = readFrame();
-            if (name == null || name.isBlank()) { socket.close(); return; }
-            username = name.trim().replaceAll("[^a-zA-Z0-9_\\-]", "");
-            if (username.isBlank()) username = "User" + (int)(Math.random() * 9999);
-
-            // Step 3: Register and announce
-            ChatServer.clients.add(this);
-            sendMessage(event("users", "Server", ChatServer.onlineUsers()));
-            System.out.println(username + " joined. Online: " + ChatServer.clients.size());
-            ChatServer.broadcastAll(event("join", username, username + " joined the chat"));
-            ChatServer.broadcastAll(event("users", "Server", ChatServer.onlineUsers()));
-
-            // Step 4: Read loop — runs until client disconnects
-            String frame;
-            while ((frame = readFrame()) != null) {
-                handleMessage(frame.trim());
-            }
-
-        } catch (IOException e) {
-            // client disconnected
-        } finally {
-            cleanup();
+        // WebSocket handshake
+        if (!doHandshake()) {
+            socket.close();
+            return;
         }
+
+        String name = readFrame();
+        if (name == null || name.isBlank()) {
+            socket.close();
+            return;
+        }
+
+        username = name.trim();
+
+        ChatServer.clients.add(this);
+        sendMessage(event("users", "Server", ChatServer.onlineUsers()));
+        ChatServer.broadcastAll(event("join", username, username + " joined"));
+        ChatServer.broadcastAll(event("users", "Server", ChatServer.onlineUsers()));
+
+        String frame;
+        while ((frame = readFrame()) != null) {
+            handleMessage(frame.trim());
+        }
+
+    } catch (IOException e) {
+    } finally {
+        cleanup();
     }
+}
 
     private void handleMessage(String text) {
         if (text.isBlank()) return;

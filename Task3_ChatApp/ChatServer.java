@@ -23,26 +23,22 @@ public class ChatServer {
 
             new Thread(() -> {
                 try {
-                    InputStream in = socket.getInputStream();
+    BufferedReader reader = new BufferedReader(
+        new InputStreamReader(socket.getInputStream())
+    );
 
-                    // Peek first few bytes to detect HTTP GET
-                    byte[] buffer = new byte[512];
-                    int len = in.read(buffer);
+    String firstLine = reader.readLine();
 
-                    if (len <= 0) {
-                        socket.close();
-                        return;
-                    }
+    if (firstLine != null && firstLine.startsWith("GET")) {
+        // Always pass full socket — let ClientHandler handle everything
+        new Thread(new ClientHandler(socket)).start();
+    } else {
+        socket.close();
+    }
 
-                    String request = new String(buffer, 0, len);
-if (request.toLowerCase().contains("upgrade: websocket")) {
-    new Thread(new ClientHandler(socket, buffer, len)).start();
-} else {
-    serveHTML(socket);
+} catch (Exception e) {
+    try { socket.close(); } catch (Exception ignored) {}
 }
-                } catch (Exception e) {
-                    try { socket.close(); } catch (Exception ignored) {}
-                }
             }).start();
         }
     }
