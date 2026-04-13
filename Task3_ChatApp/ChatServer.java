@@ -1,4 +1,3 @@
-
 import java.io.*;
 import java.net.*;
 import java.nio.file.*;
@@ -8,7 +7,6 @@ import java.util.concurrent.*;
 public class ChatServer {
 
     static final int PORT = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
-
     static final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
 
     public static void main(String[] args) throws IOException {
@@ -20,79 +18,19 @@ public class ChatServer {
 
         while (true) {
             Socket socket = serverSocket.accept();
-
-            new Thread(() -> {
-                try {
-    BufferedReader reader = new BufferedReader(
-        new InputStreamReader(socket.getInputStream())
-    );
-
-    String firstLine = reader.readLine();
-
-    if (firstLine != null && firstLine.startsWith("GET")) {
-        // Always pass full socket — let ClientHandler handle everything
-        new Thread(new ClientHandler(socket)).start();
-    } else {
-        socket.close();
-    }
-
-} catch (Exception e) {
-    try { socket.close(); } catch (Exception ignored) {}
-}
-            }).start();
+            new Thread(new ClientHandler(socket)).start();
         }
     }
 
-    // Serve index.html
-    static void serveHTML(Socket socket) throws IOException {
-        OutputStream out = socket.getOutputStream();
-
-        File file = new File("index.html");
-
-        if (!file.exists()) {
-            String body = "<h2>index.html not found</h2>";
-            String response =
-                    "HTTP/1.1 404 Not Found\r\n" +
-                    "Content-Type: text/html\r\n" +
-                    "Content-Length: " + body.length() + "\r\n\r\n" +
-                    body;
-
-            out.write(response.getBytes());
-            out.flush();
-            socket.close();
-            return;
-        }
-
-        byte[] data = Files.readAllBytes(file.toPath());
-
-        String header =
-                "HTTP/1.1 200 OK\r\n" +
-                "Content-Type: text/html; charset=UTF-8\r\n" +
-                "Content-Length: " + data.length + "\r\n\r\n";
-
-        out.write(header.getBytes());
-        out.write(data);
-        out.flush();
-        socket.close();
-    }
-
-    // Broadcast to all clients
     static void broadcastAll(String message) {
-        for (ClientHandler client : clients) {
-            client.sendMessage(message);
-        }
+        for (ClientHandler client : clients) client.sendMessage(message);
     }
 
-    // Send to others (not sender)
     static void broadcast(String message, ClientHandler sender) {
-        for (ClientHandler client : clients) {
-            if (client != sender) {
-                client.sendMessage(message);
-            }
-        }
+        for (ClientHandler client : clients)
+            if (client != sender) client.sendMessage(message);
     }
 
-    // List of online users
     static String onlineUsers() {
         StringBuilder sb = new StringBuilder();
         for (ClientHandler c : clients) {

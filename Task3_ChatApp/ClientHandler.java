@@ -1,7 +1,7 @@
-
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.security.*;
 import java.text.*;
 import java.util.*;
@@ -17,82 +17,138 @@ public class ClientHandler implements Runnable {
     private static final SimpleDateFormat SDF = new SimpleDateFormat("HH:mm");
     private static final String WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-    
-
-// Original constructor (not used anymore but keep it)
-public ClientHandler(Socket socket) {
-    this.socket = socket;
-}
-
-
+    public ClientHandler(Socket socket) {
+        this.socket = socket;
+    }
 
     @Override
     public void run() {
         try {
-        in = socket.getInputStream();
-        out = socket.getOutputStream();
+            in  = socket.getInputStream();
+            out = socket.getOutputStream();
 
-        // WebSocket handshake
-        if (!doHandshake()) {
-            socket.close();
-            return;
+            // Read ALL HTTP headers first
+            Map<String, String> headers = new HashMap<>();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+            String requestLine = reader.readLine();
+            if (requestLine == null) { socket.close(); return; }
+
+            String line;
+            while ((line = reader.readLine()) != null && !line.isBlank()) {
+                int colon = line.indexOf(':');
+                if (colon > 0)
+                    headers.put(line.substring(0, colon).trim().toLowerCase(),
+                                line.substring(colon + 1).trim());
+            }
+
+            // Decide: WebSocket upgrade or plain HTTP?
+            String upgrade = headers.getOrDefault("upgrade", "");
+            if (upgrade.equalsIgnoreCase("websocket")) {
+                handleWebSocket(headers);
+            } else {
+                serveHTML();
+            }
+
+        } catch (IOException e) {
+            // ignore
+        } finally {
+            try { socket.close(); } catch (IOException ignored) {}
         }
+    }
 
+    // ── Serve index.html ──────────────────────────────────────────────────────
+
+    private void serveHTML() throws IOException {
+        File file = new File("index.html");
+        if (!file.exists()) {
+            String body = "<h2>index.html not found.</h2>";
+            out.write(("HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: "
+                + body.length() + "\r\nConnection: close\r\n\r\n" + body).getBytes());
+        } else {
+            byte[] data = Files.readAllBytes(file.toPath());
+            String header = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: text/html; charset=UTF-8\r\n" +
+                            "Content-Length: " + data.length + "\r\n" +
+                            "Connection: close\r\n\r\n";
+            out.write(header.getBytes());
+            out.write(data);
+        }
+        out.flush();
+        socket.close();
+    }
+
+    // ── WebSocket flow ────────────────────────────────────────────────────────
+
+    private void handleWebSocket(Map<String, String> headers) throws IOException {
+        // Complete the handshake
+        String key = headers.get("sec-websocket-key");
+        if (key == null) { socket.close(); return; }
+
+        String accept;
+        try {
+            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+            byte[] hash = sha1.digest((key + WS_MAGIC).getBytes(StandardCharsets.UTF_8));
+            accept = Base64.getEncoder().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) { socket.close(); return; }
+
+        String response =
+            "HTTP/1.1 101 Switching Protocols\r\n" +
+            "Upgrade: websocket\r\n" +
+            "Connection: Upgrade\r\n" +
+            "Sec-WebSocket-Accept: " + accept + "\r\n\r\n";
+        out.write(response.getBytes(StandardCharsets.UTF_8));
+        out.flush();
+
+        // First frame = username
         String name = readFrame();
-        if (name == null || name.isBlank()) {
-            socket.close();
-            return;
-        }
-
-        username = name.trim();
+        if (name == null || name.isBlank()) { socket.close(); return; }
+        username = name.trim().replaceAll("[^a-zA-Z0-9_\\-]", "");
+        if (username.isBlank()) username = "User" + (int)(Math.random() * 9999);
 
         ChatServer.clients.add(this);
+        System.out.println(username + " joined. Online: " + ChatServer.clients.size());
+
         sendMessage(event("users", "Server", ChatServer.onlineUsers()));
         ChatServer.broadcastAll(event("join", username, username + " joined"));
         ChatServer.broadcastAll(event("users", "Server", ChatServer.onlineUsers()));
 
+        // Read loop
         String frame;
         while ((frame = readFrame()) != null) {
             handleMessage(frame.trim());
         }
 
-    } catch (IOException e) {
-    } finally {
         cleanup();
     }
-}
+
+    // ── Message handling ──────────────────────────────────────────────────────
 
     private void handleMessage(String text) {
         if (text.isBlank()) return;
         String ts = SDF.format(new Date());
 
-        // Private message: /msg targetUser hello there
         if (text.startsWith("/msg ")) {
             String[] parts = text.split(" ", 3);
             if (parts.length < 3) {
                 sendMessage(event("error", "Server", "Usage: /msg username message"));
                 return;
             }
-            String targetName = parts[1];
-            String pmText = parts[2];
-            ClientHandler target = findClient(targetName);
+            ClientHandler target = findClient(parts[1]);
             if (target == null) {
-                sendMessage(event("error", "Server", "User '" + targetName + "' not found"));
+                sendMessage(event("error", "Server", "User '" + parts[1] + "' not found"));
                 return;
             }
-            String pm = pm(username, targetName, pmText, ts);
+            String pm = pm(username, parts[1], parts[2], ts);
             target.sendMessage(pm);
-            sendMessage(pm); // echo to sender
+            sendMessage(pm);
             return;
         }
 
-        // /users command
         if (text.equals("/users")) {
             sendMessage(event("users", "Server", ChatServer.onlineUsers()));
             return;
         }
 
-        // Normal message — broadcast to everyone
         System.out.println("[" + username + "]: " + text);
         ChatServer.broadcastAll(message(username, text, ts));
     }
@@ -108,11 +164,12 @@ public ClientHandler(Socket socket) {
         try { socket.close(); } catch (IOException ignored) {}
         if (username != null) {
             System.out.println(username + " disconnected. Online: " + ChatServer.clients.size());
-            ChatServer.broadcastAll(event("leave", username, username + " left the chat"));
+            ChatServer.broadcastAll(event("leave", username, username + " left"));
+            ChatServer.broadcastAll(event("users", "Server", ChatServer.onlineUsers()));
         }
     }
 
-    // ── JSON builders (no external library needed) ──────────────────────────
+    // ── JSON builders ─────────────────────────────────────────────────────────
 
     private String message(String user, String msg, String ts) {
         return "{\"type\":\"message\",\"username\":" + q(user) +
@@ -142,14 +199,14 @@ public ClientHandler(Socket socket) {
                        .replace("\n","\\n").replace("\r","\\r") + "\"";
     }
 
-    // ── WebSocket send: synchronized so two threads can't interleave bytes ──
+    // ── WebSocket frame I/O ───────────────────────────────────────────────────
 
     synchronized void sendMessage(String text) {
         try {
             byte[] payload = text.getBytes(StandardCharsets.UTF_8);
             int len = payload.length;
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
-            buf.write(0x81); // FIN + text opcode
+            buf.write(0x81);
             if (len <= 125) {
                 buf.write(len);
             } else if (len <= 65535) {
@@ -165,8 +222,6 @@ public ClientHandler(Socket socket) {
             out.flush();
         } catch (IOException ignored) {}
     }
-
-    // ── WebSocket receive ────────────────────────────────────────────────────
 
     private String readFrame() throws IOException {
         int b1 = in.read(); if (b1 == -1) return null;
@@ -196,43 +251,8 @@ public ClientHandler(Socket socket) {
         }
 
         if (masked) for (int i = 0; i < payload.length; i++) payload[i] ^= mask[i % 4];
-
-        if ((b1 & 0x0F) == 0x8) return null; // close frame
+        if ((b1 & 0x0F) == 0x8) return null;
 
         return new String(payload, StandardCharsets.UTF_8);
-    }
-
-    // ── WebSocket HTTP upgrade handshake ─────────────────────────────────────
-
-    private boolean doHandshake() throws IOException {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        Map<String, String> headers = new HashMap<>();
-        String line;
-        while ((line = reader.readLine()) != null && !line.isBlank()) {
-            int colon = line.indexOf(':');
-            if (colon > 0)
-                headers.put(line.substring(0, colon).trim().toLowerCase(),
-                            line.substring(colon + 1).trim());
-        }
-
-        String key = headers.get("sec-websocket-key");
-        if (key == null) return false;
-
-        String accept;
-        try {
-            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-            byte[] hash = sha1.digest((key + WS_MAGIC).getBytes(StandardCharsets.UTF_8));
-            accept = Base64.getEncoder().encodeToString(hash);
-        } catch (NoSuchAlgorithmException e) { return false; }
-
-        String response =
-            "HTTP/1.1 101 Switching Protocols\r\n" +
-            "Upgrade: websocket\r\n" +
-            "Connection: Upgrade\r\n" +
-            "Sec-WebSocket-Accept: " + accept + "\r\n\r\n";
-
-        out.write(response.getBytes(StandardCharsets.UTF_8));
-        out.flush();
-        return true;
     }
 }
