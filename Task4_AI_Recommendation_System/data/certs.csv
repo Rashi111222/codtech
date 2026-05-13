@@ -1,0 +1,11 @@
+certID,certName,provider,relatedJob,difficulty,link
+301,Oracle Java SE 11 Developer,Oracle,Java Backend Developer,Intermediate,https://education.oracle.com
+302,AWS Cloud Practitioner,Amazon,Cloud Engineer,Beginner,https://aws.amazon.com/certification
+303,Google Data Analytics,Google,Data Analyst,Beginner,https://grow.google
+304,Meta Frontend Developer,Meta,Frontend Developer,Intermediate,https://coursera.org
+305,MongoDB Developer,MongoDB,MERN Stack Developer,Beginner,https://university.mongodb.com
+306,Spring Professional,VMware,Java Full Stack Developer,Advanced,https://spring.io/training
+307,TensorFlow Developer,Google,ML Engineer,Intermediate,https://tensorflow.org/certificate
+308,Microsoft Azure Fundamentals,Microsoft,DevOps Engineer,Beginner,https://learn.microsoft.com
+309,Python PCEP,Python Institute,Python Developer,Beginner,https://pythoninstitute.org
+310,React Developer,Meta,MERN Stack Developer,Intermediate,https://coursera.org

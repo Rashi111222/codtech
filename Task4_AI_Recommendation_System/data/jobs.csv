@@ -1,0 +1,11 @@
+jobID,jobTitle,requiredSkills,avgSalary,category
+201,Java Backend Developer,Java-Spring Boot-SQL-DSA,8LPA,Backend
+202,Python Developer,Python-SQL-DSA,7LPA,Backend
+203,ML Engineer,Python-ML/AI-SQL-DSA,12LPA,AI/ML
+204,Data Analyst,Python-SQL-ML/AI,6LPA,Data
+205,Frontend Developer,HTML/CSS-JavaScript-React,6LPA,Frontend
+206,MERN Stack Developer,JavaScript-React-SQL-HTML/CSS,9LPA,Fullstack
+207,DevOps Engineer,AWS-Python-SQL,10LPA,Cloud
+208,Cloud Engineer,AWS-Java-Spring Boot,11LPA,Cloud
+209,Java Full Stack Developer,Java-Spring Boot-SQL-React,10LPA,Fullstack
+210,Data Engineer,Python-SQL-AWS-ML/AI,11LPA,Data
