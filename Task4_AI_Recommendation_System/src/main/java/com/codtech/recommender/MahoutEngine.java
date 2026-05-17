@@ -1,5 +1,6 @@
 package com.codtech.recommender;
 
+import org.apache.mahout.cf.taste.impl.neighborhood.NearestNUserNeighborhood;
 import org.apache.mahout.cf.taste.impl.neighborhood.ThresholdUserNeighborhood;
 import org.apache.mahout.cf.taste.impl.recommender.GenericItemBasedRecommender;
 import org.apache.mahout.cf.taste.impl.recommender.GenericUserBasedRecommender;
@@ -14,6 +15,7 @@ import org.apache.mahout.cf.taste.similarity.ItemSimilarity;
 import org.apache.mahout.cf.taste.similarity.UserSimilarity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.apache.mahout.cf.taste.impl.neighborhood.NearestNUserNeighborhood;
 
 import java.util.List;
 
@@ -31,7 +33,7 @@ public class MahoutEngine {
 
         // User Based CF - Pearson Correlation
         UserSimilarity userSimilarity = new PearsonCorrelationSimilarity(model);
-        UserNeighborhood neighborhood = new ThresholdUserNeighborhood(0.1, userSimilarity, model);
+       UserNeighborhood neighborhood = new NearestNUserNeighborhood(3, userSimilarity, model);
         userBasedRecommender = new GenericUserBasedRecommender(model, neighborhood, userSimilarity);
 
         // Item Based CF - Cosine Similarity

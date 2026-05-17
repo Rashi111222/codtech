@@ -1,5 +1,6 @@
 package com.codtech.recommender;
 
+import org.apache.mahout.cf.taste.model.DataModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class RecommendationController {
     @Autowired
     private MahoutEngine mahoutEngine;
 
+    @Autowired DataLoader dataLoader;
     @GetMapping("/recommend/jobs/{userId}")
     public Map<String, Object> getJobRecommendations(@PathVariable long userId) {
         Map<String, Object> response = new HashMap<>();
@@ -88,4 +90,18 @@ public class RecommendationController {
         }
         return response;
     }
+
+    @GetMapping("/debug/{userId}")
+public Map<String, Object> debug(@PathVariable long userId) {
+    Map<String, Object> response = new HashMap<>();
+    try {
+        DataModel model = dataLoader.loadData();
+        response.put("numUsers", model.getNumUsers());
+        response.put("numItems", model.getNumItems());
+        response.put("userExists", model.getPreferencesFromUser(userId).length());
+    } catch (Exception e) {
+        response.put("error", e.getMessage());
+    }
+    return response;
+}
 }
