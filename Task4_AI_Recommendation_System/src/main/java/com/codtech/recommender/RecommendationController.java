@@ -21,6 +21,8 @@ public class RecommendationController {
 
     @Autowired
     private MahoutEngine mahoutEngine;
+    @Autowired
+    private GroqService groqService;
 
     @Autowired DataLoader dataLoader;
     @GetMapping("/recommend/jobs/{userId}")
@@ -104,4 +106,32 @@ public Map<String, Object> debug(@PathVariable long userId) {
     }
     return response;
 }
+
+@GetMapping("/explain/{userId}/{jobId}")
+    public Map<String, Object> explainRecommendation(
+            @PathVariable long userId,
+            @PathVariable long jobId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<Map<String, String>> jobs = jobRecommender.getRecommendations(userId, 10);
+            String jobTitle = "this role";
+            String requiredSkills = "various skills";
+            for (Map<String, String> job : jobs) {
+                if (job.get("jobId").equals(String.valueOf(jobId))) {
+                    jobTitle = job.get("title");
+                    requiredSkills = job.get("skills");
+                    break;
+                }
+            }
+            String skillSummary = "Java:" + userId + "/5, DSA:5/5, SQL:4/5";
+            String explanation = groqService.getExplanation(skillSummary, jobTitle, requiredSkills);
+            response.put("success", true);
+            response.put("explanation", explanation);
+            response.put("jobTitle", jobTitle);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
 }
